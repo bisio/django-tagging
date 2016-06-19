@@ -30,9 +30,6 @@ class TagField(CharField):
         # Save tags back to the database post-save
         signals.post_save.connect(self._save, cls, True)
 
-        # Update tags from Tag objects post-init
-        signals.post_init.connect(self._update, cls, True)
-
     def __get__(self, instance, owner=None):
         """
         Tag getter. Returns an instance's tags if accessed on an instance, and
@@ -55,7 +52,8 @@ class TagField(CharField):
         # Handle access on the model (i.e. Link.tags)
         if instance is None:
             return edit_string_for_tags(Tag.objects.usage_for_model(owner))
-
+        elif instance.pk is not None and not hasattr(instance, '_%s_cache' % self.attname):
+            self._update_instance_tag_cache(instance)
         return self._get_instance_tag_cache(instance)
 
     def __set__(self, instance, value):
@@ -74,13 +72,6 @@ class TagField(CharField):
         """
         tags = self._get_instance_tag_cache(kwargs['instance'])
         Tag.objects.update_tags(kwargs['instance'], tags)
-
-    def _update(self, **kwargs): #signal, sender, instance):
-        """
-        Update tag cache from TaggedItem objects.
-        """
-        instance = kwargs['instance']
-        self._update_instance_tag_cache(instance)
 
     def __delete__(self, instance):
         """
